@@ -9,6 +9,11 @@ ELO_INITIAL = 1000
 CONFIG_PATH = os.path.expanduser('~/.elo/config')
 MATCH_HISTORY_DIR = os.path.expanduser('~/.elo/match_history')
 
+def get_players(competition) -> dict[str, str]:
+    hist = load_match_history(competition)
+    unique_players = set([match[0] for match in hist] + [match[1] for match in hist])
+    return {player.lower(): player for player in unique_playes}
+
 def load_config():
     if not os.path.exists(CONFIG_PATH):
         return {}
@@ -34,30 +39,28 @@ def save_match_history(competition, history):
         for match in history:
             f.write(','.join(match) + '\n')
 
-def calculate_elo(rating1, rating2, result):
+def calculate_elo(rating1, rating2):
     K = 32
     expected1 = 1 / (1 + 10 ** ((rating2 - rating1) / 400))
     expected2 = 1 / (1 + 10 ** ((rating1 - rating2) / 400))
-    new_rating1 = rating1 + K * (result - expected1)
-    new_rating2 = rating2 + K * ((1 - result) - expected2)
+    new_rating1 = rating1 + K * (1 - expected1)
+    new_rating2 = rating2 + K * (- expected2)
     return new_rating1, new_rating2
 
-def update_elo(competition, name1, name2, result):
+def update_elo(competition, name1, name2):
     history = load_match_history(competition)
     ratings = {name: ELO_INITIAL for name in set([match[0] for match in history] + [match[1] for match in history])}
     for match in history:
         if match[1] != '':
             ratings[match[0]], ratings[match[1]] = calculate_elo(ratings[match[0]], ratings[match[1]], int(match[2]))
     new_rating1, new_rating2 = calculate_elo(ratings[name1], ratings[name2], result)
-    history.append([name1, name2, str(result)])
+    history.append([name1, name2])
     save_match_history(competition, history)
     return new_rating1, new_rating2
 
-def create_user(competition, name):
-    history = load_match_history(competition)
-    if name not in [match[0] for match in history] and name not in [match[1] for match in history]:
-        history.append([name, '', '0'])
-        save_match_history(competition, history)
+def create_user(name):
+    if input(f'Do you want to create a user named {name}? [y]/n').lower() == 'n':
+        exit()
 
 def undo_last_match(competition):
     history = load_match_history(competition)
@@ -103,11 +106,11 @@ def main():
 
     if args.command == 'match':
         name1, name2 = args.name1, args.name2
-        history = load_match_history(competition)
-        if name1 not in [match[0] for match in history] and name2 not in [match[1] for match in history]:
-            create_user(competition, name1)
-            create_user(competition, name2)
-        update_elo(competition, name1, name2, 1)
+        if name1.lower() not in get_players(competition):
+            create_user(name1)
+        if name2.lower() not in get_players(competition):
+            create_user(name2)
+        update_elo(competition, name1, name2)
     elif args.command == 'undo':
         undo_last_match(competition)
     elif args.command == 'ranking':
