@@ -44,9 +44,10 @@ def calculate_elo(rating1, rating2, result):
 
 def update_elo(competition, name1, name2, result):
     history = load_match_history(competition)
-    ratings = {name: ELO_INITIAL for name in [name1, name2]}
+    ratings = {name: ELO_INITIAL for name in set([match[0] for match in history] + [match[1] for match in history])}
     for match in history:
-        ratings[match[0]], ratings[match[1]] = calculate_elo(ratings[match[0]], ratings[match[1]], int(match[2]))
+        if match[1] != '':
+            ratings[match[0]], ratings[match[1]] = calculate_elo(ratings[match[0]], ratings[match[1]], int(match[2]))
     new_rating1, new_rating2 = calculate_elo(ratings[name1], ratings[name2], result)
     history.append([name1, name2, str(result)])
     save_match_history(competition, history)
@@ -91,6 +92,9 @@ def main():
     start_parser = subparsers.add_parser('start', help='Start a new competition')
     start_parser.add_argument('competition', type=str, help='Name of the competition')
 
+    change_competition_parser = subparsers.add_parser('change_competition', help='Change the default competition')
+    change_competition_parser.add_argument('competition', type=str, help='Name of the new competition')
+
     args = parser.parse_args()
 
     config = load_config()
@@ -98,7 +102,8 @@ def main():
 
     if args.command == 'match':
         name1, name2 = args.name1, args.name2
-        if name1 not in [match[0] for match in load_match_history(competition)] and name2 not in [match[1] for match in load_match_history(competition)]:
+        history = load_match_history(competition)
+        if name1 not in [match[0] for match in history] and name2 not in [match[1] for match in history]:
             create_user(competition, name1)
             create_user(competition, name2)
         update_elo(competition, name1, name2, args.result)
@@ -107,6 +112,9 @@ def main():
     elif args.command == 'ranking':
         show_ranking(competition)
     elif args.command == 'start':
+        config['default_competition'] = args.competition
+        save_config(config)
+    elif args.command == 'change_competition':
         config['default_competition'] = args.competition
         save_config(config)
 
