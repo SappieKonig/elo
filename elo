@@ -83,7 +83,6 @@ def main():
     match_parser = subparsers.add_parser('match', help='Record a match between two players')
     match_parser.add_argument('name1', type=str, help='Name of the first player')
     match_parser.add_argument('name2', type=str, help='Name of the second player')
-    match_parser.add_argument('result', type=int, choices=[0, 1], help='Result of the match (0 for name1, 1 for name2)')
 
     undo_parser = subparsers.add_parser('undo', help='Undo the last match')
 
@@ -94,6 +93,8 @@ def main():
 
     change_competition_parser = subparsers.add_parser('change_competition', help='Change the default competition')
     change_competition_parser.add_argument('competition', type=str, help='Name of the new competition')
+
+    list_parser = subparsers.add_parser('list', help='List all existing competitions and the current competition')
 
     args = parser.parse_args()
 
@@ -106,7 +107,7 @@ def main():
         if name1 not in [match[0] for match in history] and name2 not in [match[1] for match in history]:
             create_user(competition, name1)
             create_user(competition, name2)
-        update_elo(competition, name1, name2, args.result)
+        update_elo(competition, name1, name2, 1)
     elif args.command == 'undo':
         undo_last_match(competition)
     elif args.command == 'ranking':
@@ -117,6 +118,14 @@ def main():
     elif args.command == 'change_competition':
         config['default_competition'] = args.competition
         save_config(config)
+    elif args.command == 'list':
+        competitions = [f for f in os.listdir(MATCH_HISTORY_DIR) if f.endswith('.txt')]
+        competitions = [os.path.splitext(f)[0] for f in competitions]
+        current_competition = config.get('default_competition', 'tt_singles')
+        print(f'Current Competition: {current_competition}')
+        print('Existing Competitions:')
+        for comp in competitions:
+            print(f'  - {comp}')
 
 if __name__ == '__main__':
     main()
