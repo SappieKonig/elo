@@ -12,7 +12,7 @@ MATCH_HISTORY_DIR = os.path.expanduser('~/.elo/match_history')
 def get_players(competition) -> dict[str, str]:
     hist = load_match_history(competition)
     unique_players = set([match[0] for match in hist] + [match[1] for match in hist])
-    return {player.lower(): player for player in unique_playes}
+    return {player.lower(): player for player in unique_players}
 
 def load_config():
     if not os.path.exists(CONFIG_PATH):
@@ -48,6 +48,9 @@ def calculate_elo(rating1, rating2):
     return new_rating1, new_rating2
 
 def update_elo(competition, name1, name2):
+    players = get_players(competition)
+    name1 = players[name1.lower()]
+    name2 = players[name2.lower()]
     history = load_match_history(competition)
     ratings = {name: ELO_INITIAL for name in set([match[0] for match in history] + [match[1] for match in history])}
     for match in history:
