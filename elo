@@ -75,8 +75,7 @@ def show_ranking(competition):
     history = load_match_history(competition)
     ratings = {name: ELO_INITIAL for name in set([match[0] for match in history] + [match[1] for match in history])}
     for match in history:
-        if match[1] != '':
-            ratings[match[0]], ratings[match[1]] = calculate_elo(ratings[match[0]], ratings[match[1]], int(match[2]))
+        ratings[match[0]], ratings[match[1]] = calculate_elo(ratings[match[0]], ratings[match[1]])
     sorted_ratings = sorted(ratings.items(), key=lambda x: x[1], reverse=True)
     max_name_length = max(len(name) for name, _ in sorted_ratings)
     for name, rating in sorted_ratings:
@@ -109,6 +108,8 @@ def main():
 
     if args.command == 'match':
         name1, name2 = args.name1, args.name2
+        if name1 == '' or name2 == '':
+            raise Exception("Could not parse empty names")
         if name1.lower() not in get_players(competition):
             create_user(name1)
         if name2.lower() not in get_players(competition):
