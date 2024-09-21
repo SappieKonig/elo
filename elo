@@ -55,8 +55,8 @@ def update_elo(competition, name1, name2):
     ratings = {name: ELO_INITIAL for name in set([match[0] for match in history] + [match[1] for match in history])}
     for match in history:
         if match[1] != '':
-            ratings[match[0]], ratings[match[1]] = calculate_elo(ratings[match[0]], ratings[match[1]], int(match[2]))
-    new_rating1, new_rating2 = calculate_elo(ratings[name1], ratings[name2], result)
+            ratings[match[0]], ratings[match[1]] = calculate_elo(ratings[match[0]], ratings[match[1]])
+    new_rating1, new_rating2 = calculate_elo(ratings[name1], ratings[name2])
     history.append([name1, name2])
     save_match_history(competition, history)
     return new_rating1, new_rating2
