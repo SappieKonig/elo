@@ -3,6 +3,7 @@
 import os
 import json
 import argparse
+from datetime import datetime
 
 ELO_INITIAL = 1000
 CONFIG_PATH = os.path.expanduser('~/.elo/config')
@@ -28,7 +29,7 @@ def load_match_history(competition):
     if not os.path.exists(history_path):
         return []
     with open(history_path, 'r') as f:
-        return [line.strip().split(',') for line in f.readlines()]
+        return [line.strip().split(',') for line in f.readlines() if line.strip()]
 
 def save_match_history(competition, history):
     history_path = os.path.join(MATCH_HISTORY_DIR, f'{competition}.txt')
@@ -51,7 +52,8 @@ def update_elo(competition, name1, name2):
     history = load_match_history(competition)
     ratings = recalculate_elo(history)
     new_rating1, new_rating2 = calculate_elo(ratings[name1], ratings[name2])
-    history.append([name1, name2])
+    timestamp = datetime.now().strftime('%Y-%m-%d')
+    history.append([name1, name2, timestamp])
     save_match_history(competition, history)
     return new_rating1, new_rating2
 
