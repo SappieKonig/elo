@@ -1,97 +1,118 @@
 #!/usr/bin/env python3
+from art import *
 
 import os
 import sys
 import json
 import argparse
+from datetime import datetime
 
 ELO_INITIAL = 1000
+K = 32  # K-factor for ELO calculation
 CONFIG_PATH = os.path.expanduser('~/.elo/config')
 MATCH_HISTORY_DIR = os.path.expanduser('~/.elo/match_history')
 
-def get_players(competition) -> dict[str, str]:
-    hist = load_match_history(competition)
-    unique_players = set([match[0] for match in hist] + [match[1] for match in hist])
-    return {player.lower(): player for player in unique_players}
-
 def load_config():
     if not os.path.exists(CONFIG_PATH):
-        return {}
+        return {'default_competition': 'default'}
     with open(CONFIG_PATH, 'r') as f:
-        return json.load(f)
+        config = json.load(f)
+        config['default_competition'] = config['default_competition'].lower()
+        return config
 
 def save_config(config):
     os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+    config['default_competition'] = config['default_competition'].lower()
     with open(CONFIG_PATH, 'w') as f:
         json.dump(config, f)
 
 def load_match_history(competition):
-    history_path = os.path.join(MATCH_HISTORY_DIR, f'{competition}.txt')
+    history_path = os.path.join(MATCH_HISTORY_DIR, f'{competition.lower()}.json')
     if not os.path.exists(history_path):
         return []
     with open(history_path, 'r') as f:
-        return [line.strip().split(',') for line in f.readlines()]
+        history = json.load(f)
+        for match in history:
+            match['winner'] = match['winner'].lower()
+            match['loser'] = match['loser'].lower()
+        return history
 
 def save_match_history(competition, history):
-    history_path = os.path.join(MATCH_HISTORY_DIR, f'{competition}.txt')
+    history_path = os.path.join(MATCH_HISTORY_DIR, f'{competition.lower()}.json')
     os.makedirs(os.path.dirname(history_path), exist_ok=True)
     with open(history_path, 'w') as f:
-        for match in history:
-            f.write(','.join(match) + '\n')
+        json.dump(history, f)
 
-def calculate_elo(rating1, rating2):
-    K = 32
+def calculate_elo(rating1, rating2, result):
     expected1 = 1 / (1 + 10 ** ((rating2 - rating1) / 400))
-    expected2 = 1 / (1 + 10 ** ((rating1 - rating2) / 400))
-    new_rating1 = rating1 + K * (1 - expected1)
-    new_rating2 = rating2 + K * (- expected2)
+    expected2 = 1 - expected1
+    new_rating1 = rating1 + K * (result - expected1)
+    new_rating2 = rating2 + K * ((1 - result) - expected2)
     return new_rating1, new_rating2
 
-def update_elo(competition, name1, name2):
-    players = get_players(competition)
-    name1 = players[name1.lower()]
-    name2 = players[name2.lower()]
+def get_elo(competition, player_name):
     history = load_match_history(competition)
-    ratings = {name: ELO_INITIAL for name in set([match[0] for match in history] + [match[1] for match in history])}
-    for match in history:
-        if match[1] != '':
-            ratings[match[0]], ratings[match[1]] = calculate_elo(ratings[match[0]], ratings[match[1]])
-    new_rating1, new_rating2 = calculate_elo(ratings[name1], ratings[name2])
-    history.append([name1, name2])
-    save_match_history(competition, history)
-    return new_rating1, new_rating2
+    players = set([match['winner'] for match in history] + [match['loser'] for match in history])
+    ratings = {player: ELO_INITIAL for player in players}
 
-def create_user(name):
-    if input(f'Do you want to create a user named {name}? [y]/n').lower() == 'n':
-        exit()
+    for match in history:
+        winner, loser = match['winner'], match['loser']
+        ratings[winner], ratings[loser] = calculate_elo(ratings[winner], ratings[loser], 1)
+
+    return round(ratings.get(player_name.lower(), ELO_INITIAL))
+
+def get_all_elos(competition):
+    history = load_match_history(competition)
+    players = set([match['winner'] for match in history] + [match['loser'] for match in history])
+    ratings = {player: ELO_INITIAL for player in players}
+
+    for match in history:
+        winner, loser = match['winner'], match['loser']
+        ratings[winner], ratings[loser] = calculate_elo(ratings[winner], ratings[loser], 1)
+
+    return ratings
+
+def add_match(competition, winner, loser):
+    history = load_match_history(competition)
+    match = {
+        'winner': winner.lower(),
+        'loser': loser.lower(),
+        'timestamp': datetime.now().isoformat()
+    }
+    history.append(match)
+    save_match_history(competition, history)
 
 def undo_last_match(competition):
     history = load_match_history(competition)
     if history:
-        history.pop()
+        removed_match = history.pop()
         save_match_history(competition, history)
+        return removed_match
+    return None
 
 def show_ranking(competition):
-    history = load_match_history(competition)
-    ratings = {name: ELO_INITIAL for name in set([match[0] for match in history] + [match[1] for match in history])}
-    for match in history:
-        ratings[match[0]], ratings[match[1]] = calculate_elo(ratings[match[0]], ratings[match[1]])
+    ratings = get_all_elos(competition)
     sorted_ratings = sorted(ratings.items(), key=lambda x: x[1], reverse=True)
     max_name_length = max(len(name) for name, _ in sorted_ratings)
     for name, rating in sorted_ratings:
-        print(f'{name:<{max_name_length}} {round(rating):>4}')
+        print(f'{name.capitalize():<{max_name_length}} {round(rating):>4}')
 
 def main():
+    print()
+
     parser = argparse.ArgumentParser(description='ELO Rating System CLI')
-    subparsers = parser.add_subparsers(dest='command')
+    subparsers = parser.add_subparsers(dest='command', required=True)
 
     match_parser = subparsers.add_parser('match', help='Record a match between two players')
-    match_parser.add_argument('name1', type=str, help='Name of the first player')
-    match_parser.add_argument('name2', type=str, help='Name of the second player')
-
-    undo_parser = subparsers.add_parser('undo', help='Undo the last match')
+    match_parser.add_argument('winner', type=str, help='Name of the winning player')
+    match_parser.add_argument('loser', type=str, help='Name of the losing player')
 
     ranking_parser = subparsers.add_parser('ranking', help='Show the ranking of players')
+
+    get_elo_parser = subparsers.add_parser('get_elo', help='Get ELO for a specific player')
+    get_elo_parser.add_argument('player', type=str, help='Name of the player')
+
+    elo_list_parser = subparsers.add_parser('elo_list', help='List ELO ratings for all players')
 
     start_parser = subparsers.add_parser('start', help='Start a new competition')
     start_parser.add_argument('competition', type=str, help='Name of the competition')
@@ -101,36 +122,51 @@ def main():
 
     list_parser = subparsers.add_parser('list', help='List all existing competitions and the current competition')
 
+    undo_parser = subparsers.add_parser('undo', help='Undo the last recorded match')
+
     args = parser.parse_args()
 
     config = load_config()
-    competition = config.get('default_competition', 'tt_singles')
+    competition = config.get('default_competition', 'default').lower()
 
     if args.command == 'match':
-        name1, name2 = args.name1, args.name2
-        if name1.lower() not in get_players(competition):
-            create_user(name1)
-        if name2.lower() not in get_players(competition):
-            create_user(name2)
-        update_elo(competition, name1, name2)
-    elif args.command == 'undo':
-        undo_last_match(competition)
+        add_match(competition, args.winner, args.loser)
+        print(f"Match recorded: {args.winner.capitalize()} ({get_elo(competition, args.winner)}) "
+              f"defeated {args.loser.capitalize()} ({get_elo(competition, args.loser)})")
     elif args.command == 'ranking':
         show_ranking(competition)
+    elif args.command == 'get_elo':
+        elo = get_elo(competition, args.player)
+        print(f"ELO for {args.player.capitalize()}: {round(elo)}")
+    elif args.command == 'elo_list':
+        ratings = get_all_elos(competition)
+        sorted_ratings = sorted(ratings.items(), key=lambda x: x[1], reverse=True)
+        max_name_length = max(len(name) for name, _ in sorted_ratings)
+        print(f"ELO ratings for all players in {competition.capitalize()}:")
+        for name, rating in sorted_ratings:
+            print(f'{name.capitalize():<{max_name_length}} {round(rating):>4}')
     elif args.command == 'start':
-        config['default_competition'] = args.competition
+        config['default_competition'] = args.competition.lower()
         save_config(config)
+        print(f"Started new competition: {args.competition.capitalize()}")
     elif args.command == 'change_competition':
-        config['default_competition'] = args.competition
+        config['default_competition'] = args.competition.lower()
         save_config(config)
+        print(f"Changed to competition: {args.competition.capitalize()}")
     elif args.command == 'list':
-        competitions = [f for f in os.listdir(MATCH_HISTORY_DIR) if f.endswith('.txt')]
-        competitions = [os.path.splitext(f)[0] for f in competitions]
-        current_competition = config.get('default_competition', 'tt_singles')
-        print(f'Current Competition: {current_competition}')
+        competitions = [os.path.splitext(f)[0] for f in os.listdir(MATCH_HISTORY_DIR) if f.endswith('.json')]
+        print(f'Current Competition: {competition.capitalize()}')
         print('Existing Competitions:')
         for comp in competitions:
-            print(f'  - {comp}')
+            print(f'  - {comp.capitalize()}')
+    elif args.command == 'undo':
+        removed_match = undo_last_match(competition)
+        if removed_match:
+            print(f"Undone match: {removed_match['winner'].capitalize()} vs {removed_match['loser'].capitalize()}")
+        else:
+            print("No matches to undo.")
+
+    print()
 
 if __name__ == '__main__':
     main()
