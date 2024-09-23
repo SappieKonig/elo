@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import os
-import sys
 import json
 import argparse
 
@@ -89,17 +88,11 @@ def main():
     match_parser.add_argument('name1', type=str, help='Name of the first player')
     match_parser.add_argument('name2', type=str, help='Name of the second player')
 
-    undo_parser = subparsers.add_parser('undo', help='Undo the last match')
-
-    ranking_parser = subparsers.add_parser('ranking', help='Show the ranking of players')
-
     start_parser = subparsers.add_parser('start', help='Start a new competition')
     start_parser.add_argument('competition', type=str, help='Name of the competition')
 
     change_competition_parser = subparsers.add_parser('change_competition', help='Change the default competition')
     change_competition_parser.add_argument('competition', type=str, help='Name of the new competition')
-
-    list_parser = subparsers.add_parser('list', help='List all existing competitions and the current competition')
 
     args = parser.parse_args()
 
