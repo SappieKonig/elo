@@ -9,10 +9,9 @@ ELO_INITIAL = 1000
 CONFIG_PATH = os.path.expanduser('~/.elo/config')
 MATCH_HISTORY_DIR = os.path.expanduser('~/.elo/match_history')
 
-def get_players(competition) -> dict[str, str]:
+def get_players(competition) -> set[str]:
     hist = load_match_history(competition)
-    unique_players = set([match[0] for match in hist] + [match[1] for match in hist])
-    return {player.lower(): player for player in unique_players}
+    return set([match[0].lower() for match in hist] + [match[1].lower() for match in hist])
 
 def load_config():
     if not os.path.exists(CONFIG_PATH):
@@ -48,18 +47,21 @@ def calculate_elo(rating1, rating2):
     return new_rating1, new_rating2
 
 def update_elo(competition, name1, name2):
-    players = get_players(competition)
-    name1 = players[name1.lower()]
-    name2 = players[name2.lower()]
+    name1 = name1.lower()
+    name2 = name2.lower()
     history = load_match_history(competition)
-    ratings = {name: ELO_INITIAL for name in set([match[0] for match in history] + [match[1] for match in history])}
-    for match in history:
-        if match[1] != '':
-            ratings[match[0]], ratings[match[1]] = calculate_elo(ratings[match[0]], ratings[match[1]])
+    ratings = recalculate_elo(history)
     new_rating1, new_rating2 = calculate_elo(ratings[name1], ratings[name2])
     history.append([name1, name2])
     save_match_history(competition, history)
     return new_rating1, new_rating2
+
+def recalculate_elo(history):
+    ratings = {name.lower(): ELO_INITIAL for match in history for name in match}
+    for match in history:
+        if match[1] != '':
+            ratings[match[0]], ratings[match[1]] = calculate_elo(ratings[match[0]], ratings[match[1]])
+    return ratings
 
 def create_user(name):
     if input(f'Do you want to create a user named {name}? [y]/n').lower() == 'n':
@@ -73,13 +75,11 @@ def undo_last_match(competition):
 
 def show_ranking(competition):
     history = load_match_history(competition)
-    ratings = {name: ELO_INITIAL for name in set([match[0] for match in history] + [match[1] for match in history])}
-    for match in history:
-        ratings[match[0]], ratings[match[1]] = calculate_elo(ratings[match[0]], ratings[match[1]])
+    ratings = recalculate_elo(history)
     sorted_ratings = sorted(ratings.items(), key=lambda x: x[1], reverse=True)
     max_name_length = max(len(name) for name, _ in sorted_ratings)
     for name, rating in sorted_ratings:
-        print(f'{name:<{max_name_length}} {round(rating):>4}')
+        print(f'{name.capitalize():<{max_name_length}} {round(rating):>4}')
 
 def main():
     parser = argparse.ArgumentParser(description='ELO Rating System CLI')
