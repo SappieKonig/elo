@@ -4,10 +4,62 @@ import os
 import json
 import argparse
 from datetime import datetime
+from collections import defaultdict
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+import time
 
 ELO_INITIAL = 1000
 CONFIG_PATH = os.path.expanduser('~/.elo/config')
 MATCH_HISTORY_DIR = os.path.expanduser('~/.elo/match_history')
+
+
+def load_and_process_data(competition):
+    history = load_match_history(competition)
+    players = get_players(competition)
+    player_ratings = defaultdict(lambda: [ELO_INITIAL])
+    # player_dates = defaultdict(lambda: [history[0][2]] if history else [])
+
+    current_ratings = {player: ELO_INITIAL for player in get_players(competition)}
+
+    for match in history:
+        winner, loser, date = match
+        winner_rating, loser_rating = calculate_elo(current_ratings[winner], current_ratings[loser])
+
+        current_ratings[winner] = winner_rating
+        current_ratings[loser] = loser_rating
+
+        for player in [winner, loser]:
+            player_ratings[player].append(current_ratings[player])
+            # player_dates[player].append(date)
+
+        for player in players:
+            if player not in [winner, loser]:
+                player_ratings[player].append(current_ratings[player])
+
+    return player_ratings#, player_dates
+
+
+def update_graph(frame, competition, ax):
+    player_ratings = load_and_process_data(competition)
+
+    ax.clear()
+    for player, ratings in player_ratings.items():
+        ax.plot(ratings, label=player.capitalize(), marker='o')
+
+    ax.set_title(f"Elo Ratings Over Time - {competition.capitalize()}")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Elo Rating")
+    ax.legend()
+    ax.grid(True)
+    plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+
+
+def live_graph_elo(competition):
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ani = FuncAnimation(fig, update_graph, fargs=(competition, ax), interval=1000)
+    plt.tight_layout()
+    plt.show()
 
 def get_players(competition) -> set[str]:
     hist = load_match_history(competition)
@@ -105,6 +157,8 @@ def main():
 
     list_parser = subparsers.add_parser('list', help='List all existing competitions and the current competition')
 
+    live_graph_parser = subparsers.add_parser('graph', help='Generate a live-updating graph of Elo ratings over time')
+
     args = parser.parse_args()
 
     config = load_config()
@@ -137,6 +191,8 @@ def main():
         print('Existing Competitions:')
         for comp in competitions:
             print(f'  - {comp}')
+    elif args.command == 'graph':
+        live_graph_elo(competition)
 
 if __name__ == '__main__':
     main()
