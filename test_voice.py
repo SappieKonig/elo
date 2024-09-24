@@ -7,7 +7,7 @@ from tortoise.utils.audio import load_audio
 
 text = "test this program. Epoch five are the GOATS."
 
-reference_clips = [load_audio(p, 22050) for p in glob.glob('/Users/kenzoheijman/PycharmProjects/elo2/data/data2/*.wav')]
+reference_clips = [load_audio(p, 22050) for p in glob.glob('/Users/kenzoheijman/PycharmProjects/elo2/data/data/*.wav')]
 tts = TextToSpeech()
 pcm_audio = tts.tts_with_preset(text, voice_samples=reference_clips, preset='fast')
 
