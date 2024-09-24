@@ -37,7 +37,7 @@ def load_and_process_data(competition):
             if player not in [winner, loser]:
                 player_ratings[player].append(current_ratings[player])
 
-    return player_ratings#, player_dates
+    return player_ratings  # , player_dates
 
 
 def update_graph(frame, competition, ax):
@@ -61,9 +61,11 @@ def live_graph_elo(competition):
     plt.tight_layout()
     plt.show()
 
+
 def get_players(competition) -> set[str]:
     hist = load_match_history(competition)
     return set([match[0].lower() for match in hist] + [match[1].lower() for match in hist])
+
 
 def load_config():
     if not os.path.exists(CONFIG_PATH):
@@ -71,10 +73,12 @@ def load_config():
     with open(CONFIG_PATH, 'r') as f:
         return json.load(f)
 
+
 def save_config(config):
     os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
     with open(CONFIG_PATH, 'w') as f:
         json.dump(config, f)
+
 
 def load_match_history(competition):
     history_path = os.path.join(MATCH_HISTORY_DIR, f'{competition}.csv')
@@ -82,6 +86,7 @@ def load_match_history(competition):
         return []
     with open(history_path, 'r') as f:
         return [line.strip().split(',') for line in list(f)[1:] if line.strip()]
+
 
 def save_match_history(competition, history):
     history_path = os.path.join(MATCH_HISTORY_DIR, f'{competition}.csv')
@@ -91,6 +96,7 @@ def save_match_history(competition, history):
         for match in history:
             f.write(','.join(match) + '\n')
 
+
 def calculate_elo(rating1, rating2):
     K = 32
     expected1 = 1 / (1 + 10 ** ((rating2 - rating1) / 400))
@@ -98,6 +104,7 @@ def calculate_elo(rating1, rating2):
     new_rating1 = rating1 + K * (1 - expected1)
     new_rating2 = rating2 + K * (-expected2)
     return new_rating1, new_rating2
+
 
 def update_elo(competition, name1, name2):
     name1 = name1.lower()
@@ -113,21 +120,25 @@ def update_elo(competition, name1, name2):
     save_match_history(competition, history)
     return new_rating1, new_rating2
 
+
 def recalculate_elo(history):
     ratings = {name.lower(): ELO_INITIAL for match in history for name in match[:2]}
     for match in history:
         ratings[match[0]], ratings[match[1]] = calculate_elo(ratings[match[0]], ratings[match[1]])
     return ratings
 
+
 def create_user(name):
     if input(f'Do you want to create a user named {name}? [y]/n').lower() == 'n':
         exit()
+
 
 def undo_last_match(competition):
     history = load_match_history(competition)
     if history:
         history.pop()
         save_match_history(competition, history)
+
 
 def show_ranking(competition):
     history = load_match_history(competition)
@@ -136,6 +147,7 @@ def show_ranking(competition):
     max_name_length = max(len(name) for name, _ in sorted_ratings)
     for name, rating in sorted_ratings:
         print(f'{name.capitalize():<{max_name_length}} {round(rating):>4}')
+
 
 def main():
     parser = argparse.ArgumentParser(description='ELO Rating System CLI')
@@ -193,6 +205,7 @@ def main():
             print(f'  - {comp}')
     elif args.command == 'graph':
         live_graph_elo(competition)
+
 
 if __name__ == '__main__':
     main()
